@@ -223,6 +223,8 @@ class MainActivity : ComponentActivity() {
 
                 // ✅ Initialize Firebase dynamically now
 
+                // Inside setContent { ... } in MainActivity
+
                 val globalSyncManager = remember {
                     GlobalOrderSyncManager(
                         firestore = firestore,
@@ -231,34 +233,20 @@ class MainActivity : ComponentActivity() {
                         role = role ?: PosRole.MAIN
                     )
                 }
+
+// Store globally in activity for later cleanup
                 globalOrderSyncManager = globalSyncManager
 
-                if (role == PosRole.MAIN) {
-                    LaunchedEffect(globalSyncManager) {
-                        globalSyncManager.startListening()
-                    }
+// Start the appropriate listener based on role
+                LaunchedEffect(globalSyncManager, role) {
+                    // Always stop any previous listener first
+                    globalSyncManager.stopListening()
+
+                    // Start listener automatically according to role
+                    globalSyncManager.startListening()
                 }
 
-//                val globalOrderSyncManager = remember {
-//                    GlobalOrderSyncManager(
-//                    firestore = firestore,
-//                    processedDao,
-//                    kitchenViewModel = kitchenVM,
-//                        role = role ?: PosRole.MAIN
-//                    )
-//                }
-//
-//                if (role == PosRole.MAIN) {
-//                    LaunchedEffect(Unit) {
-//                        globalOrderSyncManager.startListening()
-//                    }
-//                }
 
-//                val startDestination = when (role) {
-//                    null -> "device_role_selection"
-//                    PosRole.MAIN -> "tables"
-//                    PosRole.WAITER -> "posWaiter"
-//                }
                 val startDestination = when (role) {
                     PosRole.WAITER -> "posWaiter"
                     else -> "tables"
@@ -861,10 +849,11 @@ class MainActivity : ComponentActivity() {
     }
 
 
+
     override fun onDestroy() {
         super.onDestroy()
-        globalOrderSyncManager?.stopListening()
-       // Log.d("SYNC", "GlobalOrderSyncManager stopped in onDestroy")
+        // Stop listener when activity is destroyed
+        globalOrderSyncManager.stopListening()
     }
 
     @Composable
