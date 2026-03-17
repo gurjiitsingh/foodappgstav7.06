@@ -36,6 +36,9 @@ interface KotItemDao {
     """)
     fun getItemsForTable(tableNo: String): Flow<List<PosKotItemEntity>>
 
+
+    @Query("SELECT * FROM pos_kot_items WHERE tableNo = :tableId")
+    suspend fun getItemsByTable(tableId: String): List<PosKotItemEntity>
     // -------------------------
     // FETCH (FINAL BILL)
     // -------------------------

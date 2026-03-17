@@ -113,13 +113,6 @@ class WaiterKitchenViewModel(
                 return@launch
             }
 
-//            Log.d("WaiterKitchenVM", "🚀 Send All triggered for table=$tableNo, total=${latestCart.size}")
-//            latestCart.forEachIndexed { index, item ->
-//                             Log.d(
-//                "ORDER_ITEM_DEBUG",
-//                "productId=${item.id}, categoryId=${item.categoryId}, categoryName=${item.categoryName}, name=${item.name}"
-//            )
-//            }
 
             if (isProcessing) return@launch
             isProcessing = true

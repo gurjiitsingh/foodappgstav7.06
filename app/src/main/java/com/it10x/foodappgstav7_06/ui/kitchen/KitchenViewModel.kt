@@ -4,7 +4,9 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.firestore.FirebaseFirestore
 import com.it10x.foodappgstav7_06.data.PrinterRole
+import com.it10x.foodappgstav7_06.data.online.sync.TableKotSyncService
 import com.it10x.foodappgstav7_06.data.pos.AppDatabaseProvider
 import com.it10x.foodappgstav7_06.data.pos.entities.PosCartEntity
 import com.it10x.foodappgstav7_06.data.pos.entities.PosKotBatchEntity
@@ -44,6 +46,7 @@ class KitchenViewModel(
 ) : AndroidViewModel(app) {
 
 
+    private val firestore = FirebaseFirestore.getInstance()
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> get() = _loading
     private val kotItemDao =
@@ -91,7 +94,10 @@ class KitchenViewModel(
 
 
 
-
+    private val tableKotSyncService = TableKotSyncService(
+        firestore,
+        kotItemDao
+    )
 
 
     fun getPendingItems(orderRef: String, orderType: String): Flow<List<PosKotItemEntity>> {
@@ -162,15 +168,10 @@ class KitchenViewModel(
 
 
                 repository.clearCart(orderType, tableId)
-//                cartRepository.syncCartCount(tableId)
-//                kotRepository.syncBillCount(tableId)
                 tableSyncManager.syncCart(tableId, orderType)
                 tableSyncManager.syncBill(tableId, orderType)
 
-//                val tableNo = currentTableId.value!!
-//                val type = currentOrderType.value
-//
-//                tableSyncManager.syncCart(tableNo, type)
+
 
             } catch (e: Exception) {
                 //  Log.e("KITCHEN_DEBUG", " Exception during placeOrder()", e)
@@ -313,14 +314,26 @@ class KitchenViewModel(
                 )
 
                 kotItemDao.markBatchKitchenPrintedBatch(batchId)
-                //kotRepository.markDoneAll(tableNo)
-                //kotRepository.markPrinted(tableNo)
-                //kotRepository.syncKinchenCount(tableNo)
-
-
-            }
+              }
 
           //  logAllKotItemsOnce()
+
+
+// 🚀 NEW: FIRESTORE TABLE SNAPSHOT SYNC (IMPORTANT)
+            try {
+                tableKotSyncService.syncTableSnapshot(
+                    tableId = tableId,
+                 //   tableNo = tableNoSafe
+                )
+
+                Log.d("TABLE_SYNC", "Triggered snapshot sync for table=$tableId")
+
+            } catch (e: Exception) {
+                Log.e("TABLE_SYNC", "Failed to trigger snapshot sync", e)
+            }
+
+
+
             true
 
         } catch (e: Exception) {

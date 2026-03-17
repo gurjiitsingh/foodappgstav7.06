@@ -403,12 +403,6 @@ class BillViewModel(
                 val waiterPending = payments
                     .filter { it.mode == "WAITER_PENDING" }
                     .sumOf { it.amount }
-//                Log.d("PAY_DEBUG", "----------- PAYMENT BREAKDOWN -----------")
-//                Log.d("PAY_DEBUG", "TotalPaidPaise: $totalPaidPaise")
-//                Log.d("PAY_DEBUG", "TotalCredit: $totalCredit")
-//                Log.d("PAY_DEBUG", "DeliveryPending: $deliveryPending")
-//                Log.d("PAY_DEBUG", "WaiterPending: $waiterPending")
-
 
                 val paidAmountPaise = when {
                     deliveryPending > 0 -> 0L
@@ -416,26 +410,10 @@ class BillViewModel(
                     else -> totalPaidPaise
                 }
 
-//                val dueAmount = when {
-//                    deliveryPending > 0 -> grandTotal
-//                    waiterPending > 0 -> 0.0   // 🔥 no due tracking
-//                    else -> (grandTotal - totalPaid).coerceAtLeast(0.0)
-//                }
-
-            //    val duePaise = (grandTotalPaise - totalPaidPaise).coerceAtLeast(0)
                 val duePaise = (grandTotalPaise - totalPaidPaise).coerceAtLeast(0)
 
                 val adjustedDue = if (duePaise <= 0) 0 else duePaise
 
-
-
-//                val paymentStatus = when {
-//                    waiterPending > 0 -> "WAITER_PENDING"
-//                    deliveryPending > 0 -> "DELIVERY_PENDING"
-//                    totalPaid == 0.0 && totalCredit > 0 -> "CREDIT"
-//                    dueAmount > 0 -> "PARTIAL"
-//                    else -> "PAID"
-//                }
 
                 val paymentStatus = when {
 
