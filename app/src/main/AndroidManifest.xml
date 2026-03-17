@@ -1,0 +1,94 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- ========================= -->
+    <!-- INTERNET (for LAN/WiFi printing) -->
+    <!-- ========================= -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- ========================= -->
+    <!-- BLUETOOTH PERMISSIONS -->
+    <!-- ========================= -->
+    <!-- Legacy Bluetooth (Android 11 and below) -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+
+    <!-- Modern Bluetooth (Android 12+) -->
+    <uses-permission
+    android:name="android.permission.BLUETOOTH_CONNECT"
+    android:required="false" />
+    <!-- Modern Bluetooth (Android 12+) -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:required="false"
+        android:usesPermissionFlags="neverForLocation" />
+
+    <!-- Internet detection -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- ========================= -->
+    <!-- USB HOST SUPPORT -->
+    <!-- ========================= -->
+    <!-- Optional hardware feature, app still works if device has no USB host -->
+    <uses-feature
+        android:name="android.hardware.usb.host"
+        android:required="false" />
+
+    <application
+        android:name=".MyApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.foodappgsta">
+
+        <!-- ========================= -->
+        <!-- MAIN ACTIVITY -->
+        <!-- ========================= -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+
+            <!-- Launcher -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- USB Device Attached -->
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+            </intent-filter>
+
+            <!-- USB Device Filter -->
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/usb_device_filter" />
+        </activity>
+
+        <!-- ========================= -->
+        <!-- USB PERMISSION RECEIVER -->
+        <!-- ========================= -->
+        <receiver
+            android:name=".usb.UsbPermissionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.it10x.foodappgstav7_06.USB_PERMISSION" />
+            </intent-filter>
+        </receiver>
+
+        <!--  ⭐⭐  ADD THIS BLOCK  ⭐⭐ -->
+        <service
+            android:name=".service.OrderListenerService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+
+
+    </application>
+</manifest>

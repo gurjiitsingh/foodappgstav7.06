@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accept any USB thermal printer -->
+    <usb-device
+        vendor-id="0"
+        product-id="0" />
+</resources>
