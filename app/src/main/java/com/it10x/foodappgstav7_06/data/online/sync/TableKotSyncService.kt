@@ -12,73 +12,64 @@ class TableKotSyncService(
 ) {
 
     suspend fun syncTableSnapshot(
-        tableId: String,
-       // tableNo: String
+        tableId: String
     ) {
         try {
-            // 1️⃣ Get all KOT items for table
-            val kotItems = kotItemDao.getItemsByTable(tableId)
-
-            if (kotItems.isEmpty()) {
-                Log.w("TABLE_SYNC", "No KOT items found for table=$tableId")
-                return
-            }
-
             val tableRef = firestore
-                .collection("table_kot_snapshots")
+                .collection("pos_tables")
                 .document(tableId)
 
-            val batch = firestore.batch()
+            // 🔥 GET ITEMS FROM ROOM
+            val items = kotItemDao.getItemsForTableSync(tableId)
+                .filter { it.status == "DONE" }
 
-            // 2️⃣ Update table metadata
-            batch.set(
-                tableRef,
+            // 🔥 CONVERT TO FIRESTORE MAP
+            val itemList = items.map {
                 mapOf(
-                    "tableNo" to tableId,
-                    "updatedAt" to System.currentTimeMillis()
+                    "productId" to it.productId,
+                    "name" to it.name,
+                    "quantity" to it.quantity,
+                    "price" to it.basePrice,
+                    "note" to (it.note ?: ""),
+                    "category" to it.categoryName
                 )
+            }
+
+            val data = mapOf(
+                "tableId" to tableId,
+                "status" to if (itemList.isEmpty()) "EMPTY" else "RUNNING",
+                "active" to itemList.isNotEmpty(),
+                "items" to itemList,
+                "updatedAt" to System.currentTimeMillis()
             )
 
-            // 3️⃣ Clear old items (IMPORTANT)
-            val oldItems = tableRef
-                .collection("items")
-                .get()
-                .await()
-
-            for (doc in oldItems.documents) {
-                batch.delete(doc.reference)
-            }
-
-            // 4️⃣ Add latest items (FULL SNAPSHOT)
-            kotItems.forEach { item ->
-
-                val itemRef = tableRef
-                    .collection("items")
-                    .document(item.id ?: UUID.randomUUID().toString())
-
-                batch.set(
-                    itemRef,
-                    mapOf(
-                        "productId" to item.productId,
-                        "productName" to item.name,
-                        "categoryId" to item.categoryId,
-                        "categoryName" to item.categoryName,
-                        "quantity" to item.quantity,
-                        "note" to item.note,
-                        "createdAt" to item.createdAt,
-                        "tableNo" to item.tableNo,
-                        "sessionId" to item.sessionId
-                    )
-                )
-            }
-
-            // 5️⃣ Commit batch
-            batch.commit().await()
-
-            Log.d("TABLE_SYNC", "✅ Snapshot synced for table=$tableId")
+            tableRef.set(data).await()
 
         } catch (e: Exception) {
-            Log.e("TABLE_SYNC", "❌ Failed to sync table snapshot", e)
+            Log.e("TABLE_SYNC", "❌ syncTableSnapshot failed", e)
+        }
+    }
+
+
+
+    suspend fun clearTableSnapshot(tableNo: String) {
+        Log.w("TABLE_SYNC", "No KOT items in table=$tableNo")
+        try {
+            val tableRef = firestore
+                .collection("pos_tables")
+                .document(tableNo)
+
+            val updateMap = mapOf(
+                "status" to "CLOSED",
+                "active" to false,
+                "items" to emptyList<Map<String, Any>>(),
+                "updatedAt" to System.currentTimeMillis()
+            )
+
+            tableRef.set(updateMap).await()
+
+        } catch (e: Exception) {
+            Log.e("TABLE_SYNC", "❌ Failed to clear table snapshot", e)
         }
     }
 }

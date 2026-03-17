@@ -3,8 +3,10 @@ package com.it10x.foodappgstav7_06.ui.bill
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.firestore.FirebaseFirestore
 import com.it10x.foodappgstav7_06.data.PrinterRole
 import com.it10x.foodappgstav7_06.data.online.repository.CashierOrderSyncRepository
+import com.it10x.foodappgstav7_06.data.online.sync.TableKotSyncService
 import com.it10x.foodappgstav7_06.data.pos.AppDatabaseProvider
 import com.it10x.foodappgstav7_06.data.pos.dao.KotItemDao
 import com.it10x.foodappgstav7_06.data.pos.dao.OrderMasterDao
@@ -98,6 +100,12 @@ class BillViewModel(
     private val _isProcessing = MutableStateFlow(false)
     val isProcessing: StateFlow<Boolean> = _isProcessing
 
+    private val firestore = FirebaseFirestore.getInstance()
+
+    private val tableKotSyncService = TableKotSyncService(
+        firestore,
+        kotItemDao
+    )
     private fun sendEvent(message: String) {
         _event.value = message
     }
@@ -280,18 +288,11 @@ class BillViewModel(
     ) {
         Log.d("PAY_DEBUG", "----------- PAYMENT INPUTS -----------")
 
-//        payments.forEach {
-//            Log.d(
-//                "PAY_DEBUG",
-//                "Mode: ${it.mode} | Amount: ${it.amount} | Paise: ${MoneyUtils.toPaise(it.amount)}"
-//            )
-//        }
+
         if (_isProcessing.value) {
             sendEvent("Payment already in progress")
             return
         }
-
-
 
         viewModelScope.launch {
 
@@ -299,11 +300,8 @@ class BillViewModel(
                 sendEvent("Payment already in progress")
                 return@launch
             }
-
             _isProcessing.value = true
-
             try {
-
             val inputPhone = phone.trim()
             val inputName = name.trim().ifBlank { "Customer" }
 
@@ -318,12 +316,6 @@ class BillViewModel(
           //  val itemSubtotal = kotItems.sumOf { it.basePrice * it.quantity }
                 val itemSubtotalPaise =
                     kotItems.sumOf { MoneyUtils.toPaise(it.basePrice) * it.quantity }
-
-//            val taxTotal = kotItems.sumOf {
-//                if (it.taxType == "exclusive")
-//                    it.basePrice * it.quantity * (it.taxRate / 100)
-//                else 0.0
-//            }
 
                 val taxTotalPaise = kotItems.sumOf {
 
@@ -360,29 +352,14 @@ class BillViewModel(
                 val safeDiscountPaise =
                     discountPaise.coerceAtMost(itemSubtotalPaise)
 
-
-
-
-
-           // val grandTotal = (itemSubtotal - safeDiscount) + adjustedTax
                 val grandTotalPaise =
                     itemSubtotalPaise - safeDiscountPaise + taxTotalPaise
 
-//                Log.d("PAY_DEBUG", "----------- BILL TOTALS -----------")
-//                Log.d("PAY_DEBUG", "ItemSubtotalPaise: $itemSubtotalPaise")
-//                Log.d("PAY_DEBUG", "TaxTotalPaise: $taxTotalPaise")
-//                Log.d("PAY_DEBUG", "DiscountPaise: $safeDiscountPaise")
-//                Log.d("PAY_DEBUG", "GrandTotalPaise: $grandTotalPaise")
+
 
             // ===========================
             // PAYMENT CALCULATION
             // ===========================
-
-
-
-//                val totalPaidPaise = payments.sumOf {
-//                    MoneyUtils.toPaise(it.amount)
-//                }
 
                 val unpaidModes = setOf("CREDIT", "DELIVERY_PENDING", "WAITER_PENDING")
 
@@ -669,11 +646,19 @@ class BillViewModel(
                     paymentRepository.insertPayments(paymentEntities)
                 }
 
-               // repository.finalizeTableAfterPayment(tableId)
+
                     repository.finalizeTableAfterPayment(
                         tableNo = tableId,
                         orderType = orderType
                     )
+
+                    // 🔥 FIRESTORE CLEAR
+                    try {
+                        tableKotSyncService.clearTableSnapshot(tableId)
+                        Log.d("TABLE_SYNC", "✅ Table cleared after payment")
+                    } catch (e: Exception) {
+                        Log.e("TABLE_SYNC", "❌ Failed to clear table", e)
+                    }
             }
 
             printOrder(orderMaster, orderItems)

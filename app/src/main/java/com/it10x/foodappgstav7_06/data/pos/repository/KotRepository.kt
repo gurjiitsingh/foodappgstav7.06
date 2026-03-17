@@ -23,15 +23,7 @@ class KotRepository(
         role: String
     ) {
 
-//        Log.d("KOT_DEBUG", "-----insertItemsInBill()------ called for table=$tableNo")
-//        Log.d("KOT_DEBUG", "Total items to insert = ${items.size}")
 
-//        items.forEachIndexed { index, item ->
-//            Log.d(
-//                "KOT_DEBUG",
-//                "[$index] name=${item.name} qty=${item.quantity} id=${item.id}"
-//            )
-//        }
 
         kotItemDao.insertAll(items)
 
@@ -41,7 +33,10 @@ class KotRepository(
 
 
 
-
+    suspend fun deleteKotByTable(tableId: String) {
+        kotItemDao.deleteByTableId(tableId)
+        syncBillCounters(tableId)
+    }
 
     suspend fun markDoneAll(tableNo: String) {
         kotItemDao.markAllDone(tableNo)

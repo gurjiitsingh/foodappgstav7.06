@@ -76,7 +76,7 @@ class GlobalOrderSyncManager(
                     val tableNo = orderDoc.getString("tableNo") ?: ""
                     val sessionId = orderDoc.getString("sessionId") ?: ""
 
-                    Log.d("SYNC_DEBUG", "Processing orderId = $orderId")
+                    Log.d("KOT_DEBUG", "Processing orderId = $tableNo")
 
                     scope.launch(Dispatchers.IO) {
                         try {
@@ -129,7 +129,7 @@ class GlobalOrderSyncManager(
                                 return@launch
                             }
 
-                            Log.d("KOT_DEBUG", "In Firestore core Called")
+                            Log.d("KOT_DEBUG", "In Firestore core Called ${tableNo}")
 
                             // 🚀 Call ViewModel to process and print KOT
                             kitchenViewModel.createKotAndPrintFirestore(
@@ -182,110 +182,99 @@ class GlobalOrderSyncManager(
     // Listen to only MAIN POS orders
 
     private fun startWaiterListener() {
-        Log.d("SYNC", "WAITER listener started")
+        Log.d("SYNC", "🚀 WAITER listener started")
+
+        waiterListener?.remove()
+        waiterListener = null
 
         waiterListener = firestore
-            .collection("main_pos_orders")
+            .collection("pos_tables")
             .addSnapshotListener { snapshot, error ->
 
-                if (error != null || snapshot == null) return@addSnapshotListener
+                if (error != null) {
+                    Log.e("SYNC", "❌ Listener error", error)
+                    return@addSnapshotListener
+                }
 
-                snapshot.documentChanges.forEach { change ->
+                if (snapshot == null) return@addSnapshotListener
 
-                    if (change.type != DocumentChange.Type.ADDED) return@forEach
+                for (change in snapshot.documentChanges) {
 
-//                    processOrder(
-//                        change.document.id,
-//                        "DINE_IN",
-//                        "WAITER"
-//                    )
+                    val doc = change.document
+
+                    val tableId = doc.id
+                    val sessionId = doc.getString("sessionId") ?: tableId
+                    val status = doc.getString("status") ?: "UNKNOWN"
+                    val active = doc.getBoolean("active") ?: false
+                    val updatedAt = doc.getLong("updatedAt") ?: 0L
+
+                    val items = doc.get("items") as? List<Map<String, Any>> ?: emptyList()
+
+                    // 🔥 LOGGING
+                    when (change.type) {
+                        DocumentChange.Type.ADDED -> {
+                            Log.d("SYNC", "🆕 TABLE ADDED → $tableId")
+                        }
+                        DocumentChange.Type.MODIFIED -> {
+                            Log.d("SYNC", "✏️ TABLE UPDATED → $tableId")
+                        }
+                        DocumentChange.Type.REMOVED -> {
+                            Log.d("SYNC", "❌ TABLE REMOVED → $tableId")
+                        }
+                    }
+
+                    Log.d("SYNC", "📌 Table: $tableId | Status: $status | Active: $active")
+
+                    if (items.isEmpty()) {
+                        Log.d("SYNC", "🪹 No items in table")
+                    } else {
+                        items.forEachIndexed { index, item ->
+                            Log.d(
+                                "SYNC",
+                                "🍽 Item[$index] → ${item["name"]} | Qty: ${item["quantity"]} | Price: ${item["price"]}"
+                            )
+                        }
+                    }
+
+                    // ✅ ONLY PROCESS ADDED / MODIFIED
+                    if (change.type != DocumentChange.Type.ADDED &&
+                        change.type != DocumentChange.Type.MODIFIED
+                    ) continue
+
+                    scope.launch(Dispatchers.IO) {
+                        try {
+
+                            // 🔐 DEDUP (VERY IMPORTANT)
+                            val uniqueId = "${tableId}_$updatedAt"
+
+                            val insertResult = processedDao.insert(
+                                ProcessedCloudOrderEntity(
+                                    orderId = uniqueId,
+                                    processedAt = System.currentTimeMillis()
+                                )
+                            )
+
+                            if (insertResult == -1L) {
+                                Log.d("SYNC", "⏭️ Already processed: $uniqueId")
+                                return@launch
+                            }
+
+                            // ✅ SINGLE SOURCE OF TRUTH
+                            kitchenViewModel.replaceKotFromFirestore(
+                                tableId = tableId,
+                                sessionId = sessionId,
+                                items = items
+                            )
+
+                        } catch (e: Exception) {
+                            Log.e("SYNC", "❌ Sync failed for table: $tableId", e)
+                        }
+                    }
                 }
             }
     }
 
     // -------------------- ORDER PROCESSING --------------------
 
-//    private fun processOrder(
-//        orderId: String,
-//        orderType: String,
-//        deviceRole: String
-//    ) {
-//
-//        scope.launch {
-//
-//            try {
-//
-////                val insertResult = processedDao.insert(
-////                    ProcessedCloudOrderEntity(
-////                        orderId,
-////                        System.currentTimeMillis()
-////                    )
-////                )
-//
-////                if (insertResult == -1L) {
-////                    Log.d("SYNC", "Order already processed: $orderId")
-////                    return@launch
-////                }
-//
-//                // Fetch items
-//                val itemsSnapshot = firestore
-//                    .collection(
-//                        if (deviceRole == "MAIN")
-//                            "waiter_orders"
-//                        else
-//                            "main_pos_orders"
-//                    )
-//                    .document(orderId)
-//                    .collection("items")
-//                    .get()
-//                    .await()
-//
-//                val cartList = itemsSnapshot.documents.map { itemDoc ->
-//
-//                    PosCartEntity(
-//                        sessionId = itemDoc.getString("sessionId") ?: "",
-//                        tableId = itemDoc.getString("tableNo") ?: "",
-//                        productId = itemDoc.getString("productId") ?: "",
-//                        name = itemDoc.getString("productName") ?: "",
-//                        categoryId = itemDoc.getString("categoryId") ?: "",
-//                        categoryName = itemDoc.getString("categoryName") ?: "",
-//                        parentId = null,
-//                        isVariant = false,
-//                        basePrice = itemDoc.getDouble("price") ?: 0.0,
-//                        quantity = (itemDoc.getLong("quantity") ?: 1L).toInt(),
-//                        taxRate = itemDoc.getDouble("taxRate") ?: 0.0,
-//                        taxType = "exclusive",
-//                        note = itemDoc.getString("note") ?: "",
-//                        modifiersJson = itemDoc.getString("modifiersJson") ?: "",
-//                        kitchenPrintReq = itemDoc.getBoolean("kitchenPrintReq") ?: true,
-//                        createdAt = System.currentTimeMillis()
-//                    )
-//                }
-//
-//                if (cartList.isEmpty()) {
-//                    Log.w("SYNC", "Cart empty for orderId=$orderId")
-//                    return@launch
-//                }
-//
-//                Log.d("KOT_DEBUG", "Processing orderId=$orderId for $role")
-//
-//                // Call kitchenViewModel to handle printing/KOT
-//                kitchenViewModel.createKotAndPrintFirestore(
-//                    orderType = orderType,
-//                    sessionId = cartList.firstOrNull()?.sessionId ?: "",
-//                    tableNo = cartList.firstOrNull()?.tableId ?: "",
-//                    cartItems = cartList,
-//                    deviceId = role.name,
-//                    deviceName = role.name,
-//                    appVersion = role.name,
-//                    role = "FIRESTORE"
-//                )
-//
-//            } catch (e: Exception) {
-//
-//                Log.e("SYNC", "Error processing order: $orderId", e)
-//
-//            }
-//        }
-//    }
+
 }

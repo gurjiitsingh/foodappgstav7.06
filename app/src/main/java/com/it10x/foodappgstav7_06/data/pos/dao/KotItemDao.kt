@@ -383,4 +383,7 @@ WHERE tableNo = :oldTable
 """)
     suspend fun transferTable(oldTable: String, newTable: String)
 
+
+    @Query("DELETE FROM pos_kot_items WHERE tableNo = :tableId")
+    suspend fun deleteByTableId(tableId: String)
 }

@@ -110,6 +110,8 @@ class KitchenViewModel(
           //  kotItemDao.getPendingItemsForSession(orderRef)
         }
     }
+
+    // THIS FUNCTION RECEIVE ITEM FROM MAIN POS
      fun cartToKotMainPOS(
         orderType: String,
         tableNo: String,
@@ -182,7 +184,7 @@ class KitchenViewModel(
     }
 
 
-
+//THIS FUNCTION RECEIVE ITEM FORM WAITER THROUGH FIRESTORE
     suspend fun createKotAndPrintFirestore(
         orderType: String,
         sessionId: String,
@@ -193,8 +195,8 @@ class KitchenViewModel(
         appVersion: String?,
         role: String,
     ) {
-        Log.d("KOT_DEBUG", "Called from: ${Throwable().stackTrace[1]}")
-
+    //    Log.d("KOT_DEBUG", "Called from: ${Throwable().stackTrace[1]}")
+    Log.d("KOT_DEBUG", "Called from: ${tableNo}")
         if (cartItems.isEmpty()) {
             Log.w("KOT_BRIDGE", "⚠️ createKotAndPrint called with empty cartItems")
             return
@@ -228,6 +230,7 @@ class KitchenViewModel(
     }
 
 
+// PRIVATE USED BY MAIN POS
 
     private suspend fun saveKotAndPrintKitchen(
         orderType: String,
@@ -268,7 +271,7 @@ class KitchenViewModel(
             kotBatchDao.insert(batch)
 
             val items = cartItems.map { cart ->
-                Log.d("ORDER_TYPE_TRACE",  "orderType=$orderType  session=$sessionId")
+                Log.d("ORDER_TYPE_TRACE",  "orderType=$orderType  tableNo=${tableNo}")
                 PosKotItemEntity(
                     id = UUID.randomUUID().toString(),
                     sessionId = sessionId,
@@ -322,11 +325,11 @@ class KitchenViewModel(
 // 🚀 NEW: FIRESTORE TABLE SNAPSHOT SYNC (IMPORTANT)
             try {
                 tableKotSyncService.syncTableSnapshot(
-                    tableId = tableId,
+                    tableId = tableNo,
                  //   tableNo = tableNoSafe
                 )
 
-                Log.d("TABLE_SYNC", "Triggered snapshot sync for table=$tableId")
+                Log.d("TABLE_SYNC", "Triggered snapshot sync for table=$tableNo")
 
             } catch (e: Exception) {
                 Log.e("TABLE_SYNC", "Failed to trigger snapshot sync", e)
@@ -346,79 +349,69 @@ class KitchenViewModel(
 
 
 
-    fun logAllKotItems() {
-        viewModelScope.launch {
-            kotItemDao.getTotalKotItems()
-                .collect { items ->
-                    Log.d("KITCHEN_DEBUG1", "Total items = ${items.size}")
 
-                    items.forEach { item ->
-                        Log.d(
-                            "KITCHEN_DEBUG1",
-                            "Status=${item.status},print=${item.kitchenPrinted}, Table=${item.tableNo},Name=${item.name},  BatchId=${item.kotBatchId},ID=${item.id}"
-                        )
-                    }
+    fun replaceKotFromFirestore(
+        tableId: String,
+        sessionId: String,
+        items: List<Map<String, Any>>
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+
+                Log.d("SYNC_VM", "🔄 Replacing KOT for table: $tableId")
+
+                // 🔥 STEP 1: DELETE OLD ITEMS (through repo)
+                kotRepository.deleteKotByTable(tableId)
+
+                if (items.isEmpty()) {
+                    Log.d("SYNC_VM", "🪹 Table empty after delete: $tableId")
+                    return@launch
                 }
+
+                // 🔥 STEP 2: MAP ITEMS
+                val cartList = items.map { item ->
+                    PosCartEntity(
+                        sessionId = sessionId,
+                        tableId = tableId,
+                        productId = item["productId"]?.toString() ?: "",
+                        name = item["name"]?.toString() ?: "",
+                        categoryId = "",
+                        categoryName = item["category"]?.toString() ?: "",
+                        parentId = null,
+                        isVariant = false,
+                        basePrice = (item["price"] as? Number)?.toDouble() ?: 0.0,
+                        quantity = (item["quantity"] as? Number)?.toInt() ?: 1,
+                        taxRate = 0.0,
+                        taxType = "exclusive",
+                        note = item["note"]?.toString() ?: "",
+                        modifiersJson = "",
+                        kitchenPrintReq = true,
+                        createdAt = System.currentTimeMillis()
+                    )
+                }
+
+                Log.d("SYNC_VM", "🍽 Inserting ${cartList.size} items")
+
+                // 🔥 STEP 3: INSERT VIA EXISTING FLOW
+                createKotAndPrintFirestore(
+                    orderType = "DINE_IN",
+                    sessionId = sessionId,
+                    tableNo = tableId,
+                    cartItems = cartList,
+                    deviceId = "TABLE_SYNC",
+                    deviceName = "TABLE_SYNC",
+                    appVersion = "TABLE_SYNC",
+                    role = "FIRESTORE_TABLE"
+                )
+
+            } catch (e: Exception) {
+                Log.e("SYNC_VM", "❌ replaceKotFromFirestore failed", e)
+            }
         }
     }
-
-    fun logAllKotItemsOnce() {
-        viewModelScope.launch {
-
-            val items = kotItemDao.getTotalKotItemsOnce()
-
-         //   Log.d("KOT_DEBUG", "Total items = ${items.size}")
-
-//            items.forEach { item ->
-//                Log.d(
-//                    "KOT_DEBUG",
-//                    "Qty=${item.quantity}, " +
-//                            "Table=${item.tableNo}, " +
-//                            "Name=${item.name}, " +
-//                            "Status=${item.status}, " +
-//                            "Printed=${item.kitchenPrinted}"
-//
-//                           // "BatchId=${item.kotBatchId}, " +
-//                           // "ID=${item.id}"
-//                )
-//            }
-        }
-    }
-
-
-
-
-
 
 
 
 }
 
 
-
-
-
-//            val allItems = kotItemDao.getAllItems(tableNo)
-//            allItems.forEach {
-//                Log.d(
-//                    "WAITER_KOT",
-//                    "PRINT -> ${it} - ${it.name} | Qty=${it.quantity} | Printed=${it.kitchenPrintReq}"
-//                )
-//            }
-
-
-//    fun debugPendingItems(tableNo: String) {
-//        viewModelScope.launch {
-//            kotItemDao.getPendingItems(tableNo).collect { items ->
-//
-//                Log.d("KITCHEN_DEBUG", "Pending items count = ${items.size}")
-//
-//                items.forEach { item ->
-//                    Log.d(
-//                        "KITCHEN_DEBUG",
-//                        "Item -> name=${item.name}, qty=${item.quantity}, status=${item.status}, table=${item.tableNo}"
-//                    )
-//                }
-//            }
-//        }
-//    }
