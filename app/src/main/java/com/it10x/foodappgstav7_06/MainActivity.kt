@@ -84,8 +84,12 @@ import com.it10x.foodappgstav7_06.core.PosRoleManager
 import com.it10x.foodappgstav7_06.firebase.ClientRegistry
 import com.it10x.foodappgstav7_06.core.rememberNetworkStatus
 import com.it10x.foodappgstav7_06.data.pos.repository.PrinterRepository
+import com.it10x.foodappgstav7_06.data.pos.repository.WaiterKitchenRepository
 import com.it10x.foodappgstav7_06.data.printer.PrinterUploadManager
+import com.it10x.foodappgstav7_06.ui.cart.CartViewModel
 import com.it10x.foodappgstav7_06.ui.settings.FirstAutoSyncScreen
+import com.it10x.foodappgstav7_06.ui.waiterkitchen.WaiterKitchenViewModel
+import com.it10x.foodappgstav7_06.ui.waiterkitchen.WaiterKitchenViewModelFactory
 
 class MainActivity : ComponentActivity() {
     private lateinit var globalOrderSyncManager: GlobalOrderSyncManager
@@ -114,6 +118,8 @@ class MainActivity : ComponentActivity() {
                 printerRepository
             )
         }
+
+
 
 
 
@@ -155,7 +161,52 @@ class MainActivity : ComponentActivity() {
             repository = repository
         )
 
+
         val kitchenVM: KitchenViewModel by viewModels { kitchenFactory }
+
+
+
+
+
+        //        val kotRepository = KotRepository(
+//            batchDao = db.kotBatchDao(),
+//            kotItemDao = db.kotItemDao(),
+//            tableDao = db.tableDao()
+//        )
+
+//        val repository = POSOrdersRepository(
+//            db = db,
+//            orderMasterDao = db.orderMasterDao(),
+//            orderProductDao = db.orderProductDao(),
+//            cartDao = db.cartDao(),
+//            tableDao = db.tableDao(),
+//            virtualTableDao = db.virtualTableDao()
+//        )
+
+// ✅ ADD THIS
+//        val cartViewModel: CartViewModel = viewModel()
+//
+//        val waiterKitchenRepository = WaiterKitchenRepository(
+//            firestore = firestore
+//        )
+//
+//        val waiterKitchenFactory = WaiterKitchenViewModelFactory(
+//            app = application,
+//            tableId = tableId,
+//            tableName = tableName,
+//            sessionId = sessionId,
+//            orderType = orderType,
+//            repository = repository,
+//            waiterKitchenRepository = waiterKitchenRepository,
+//            cartViewModel = cartViewModel
+//
+//        )
+
+
+       // val waiterkitchenViewModel: WaiterKitchenViewModel by viewModels { waiterKitchenFactory }
+
+
+
 
         setContent {
 
@@ -230,7 +281,8 @@ class MainActivity : ComponentActivity() {
                         firestore = firestore,
                         processedDao = processedDao,
                         kitchenViewModel = kitchenVM,
-                        role = role ?: PosRole.MAIN
+                      //  waiterkitchenViewModel,
+                        role = role ?: PosRole.MAIN,
                     )
                 }
 

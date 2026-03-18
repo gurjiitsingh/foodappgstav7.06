@@ -124,7 +124,7 @@ fun WaiterBillDialog(
                         modifier = Modifier.padding(bottom = 4.dp)
                     )
 
-
+                    Spacer(Modifier.height(14.dp))
                     Divider(thickness = 1.dp, color = Color.Gray.copy(alpha = 0.4f))
                     WaiterBillScreen(
                         viewModel = billViewModel,
@@ -169,7 +169,7 @@ fun WaiterBillDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "Actions1",
+                            "Actions",
                             style = MaterialTheme.typography.titleSmall,
                             color = Color.White
                         )
@@ -188,6 +188,7 @@ fun WaiterBillDialog(
                         ) {
                             Text("Close", fontSize = 12.sp)
                         }
+                        Spacer(Modifier.height(14.dp))
                     }
 
 

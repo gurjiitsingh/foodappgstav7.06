@@ -704,6 +704,17 @@ class BillViewModel(
                 tableSyncManager.syncCart(tableId, orderType)
                 tableSyncManager.syncBill(tableId, orderType)
 
+                //  NEW: FIRESTORE TABLE SNAPSHOT SYNC (IMPORTANT)
+                try {
+                        tableKotSyncService.syncTableSnapshot(
+                            tableId = tableId,
+                            source = "POS"
+                        )
+
+                } catch (e: Exception) {
+                    Log.e("TABLE_SYNC", "Failed to trigger snapshot sync", e)
+                }
+
             } catch (e: Exception) {
                 Log.e("DELETE", "Failed to delete item", e)
             }
@@ -766,8 +777,6 @@ class BillViewModel(
 
             val qty = newQty.coerceAtLeast(0)
 
-            Log.d("EDIT_DEBUG", "Requested update itemId=$itemId newQty=$qty")
-
             val targetUi = _uiState.value.items
                 .find { it.id == itemId }
 
@@ -776,13 +785,10 @@ class BillViewModel(
                 return@launch
             }
 
-            Log.d("EDIT_DEBUG", "✅ targetUi found name=${targetUi.name} qty=${targetUi.quantity}")
-
             val allItems = kotItemDao.getItemsForTableSync(tableId)
 
 
 
-            Log.d("EDIT_DEBUG", "DB items count=${allItems.size}")
 
             val groupedItems = allItems.filter {
                 it.productId == targetUi.productId &&
@@ -793,17 +799,17 @@ class BillViewModel(
                         it.status == "DONE"
             }
 
-            Log.d("EDIT_DEBUG", "Grouped items found=${groupedItems.size}")
-            groupedItems.forEach {
-                Log.d("EDIT_DEBUG", "Match -> id=${it.id} qty=${it.quantity}")
-            }
+
+//            groupedItems.forEach {
+//                Log.d("EDIT_DEBUG", "Match -> id=${it.id} qty=${it.quantity}")
+//            }
 
             // Delete
             groupedItems.forEach {
                 kotItemDao.deleteItemById(it.id)
             }
 
-            Log.d("EDIT_DEBUG", "Deleted grouped items")
+
 
             if (qty > 0 && groupedItems.isNotEmpty()) {
 
@@ -820,7 +826,18 @@ class BillViewModel(
             }
 
             val after = kotItemDao.getItemsForTableSync(tableId)
-            Log.d("EDIT_DEBUG", "After update DB total qty = ${after.sumOf { it.quantity }}")
+
+            //  NEW: FIRESTORE TABLE SNAPSHOT SYNC (IMPORTANT)
+            try {
+                tableKotSyncService.syncTableSnapshot(
+                    tableId = tableId,
+                    source = "POS"
+                )
+
+            } catch (e: Exception) {
+                Log.e("TABLE_SYNC", "Failed to trigger snapshot sync", e)
+            }
+
         }
     }
 

@@ -4,6 +4,8 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.firestore.FirebaseFirestore
+import com.it10x.foodappgstav7_06.data.online.sync.TableKotSyncService
 import com.it10x.foodappgstav7_06.data.pos.AppDatabaseProvider
 import com.it10x.foodappgstav7_06.data.pos.entities.TableEntity
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +39,7 @@ class PosTableViewModel(app: Application) : AndroidViewModel(app) {
     private val orderDao = database.orderMasterDao()
     private val repository = TableRepository(dao)
 
+    private val firestore = FirebaseFirestore.getInstance()
     private val cartRepository = CartRepository(
         dao = database.cartDao(),
         tableDao = dao
@@ -46,6 +49,11 @@ class PosTableViewModel(app: Application) : AndroidViewModel(app) {
         batchDao = database.kotBatchDao(),
         kotItemDao = database.kotItemDao(),
         tableDao = dao
+    )
+
+    private val tableKotSyncService = TableKotSyncService(
+        firestore,
+        kotItemDao = database.kotItemDao(),
     )
 
     init {
@@ -158,10 +166,10 @@ class PosTableViewModel(app: Application) : AndroidViewModel(app) {
 
     fun transferTable(oldTableId: String, newTableId: String) {
         viewModelScope.launch {
-
             // move KOT items
             kotRepository.transferTable(oldTableId, newTableId)
-
+            Log.d("TABLE_SYNC", "Triggered snapshot sync for table=$oldTableId")
+            Log.d("TABLE_SYNC", "Triggered snapshot sync for table=$newTableId")
             // refresh table counters
             cartRepository.syncCartCount(oldTableId)
             cartRepository.syncCartCount(newTableId)
@@ -171,6 +179,23 @@ class PosTableViewModel(app: Application) : AndroidViewModel(app) {
 
             kotRepository.syncBillCount(oldTableId)
             kotRepository.syncBillCount(newTableId)
+            // 🚀 NEW: FIRESTORE TABLE SNAPSHOT SYNC (IMPORTANT)
+//            try {
+//                tableKotSyncService.syncTableSnapshot(
+//                    tableId = oldTableId,
+//                   )
+//
+//                tableKotSyncService.syncTableSnapshot(
+//                    tableId = newTableId,
+//                   )
+//
+//               Log.d("TABLE_SYNC", "Triggered snapshot sync for table=$newTableId")
+//
+//            } catch (e: Exception) {
+//                Log.e("TABLE_SYNC", "Failed to trigger snapshot sync", e)
+//            }
+
+
         }
     }
 

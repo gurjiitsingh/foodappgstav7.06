@@ -136,21 +136,21 @@ class WaiterKitchenViewModel(
                     return@launch
                 }
 
-                val billSaved = saveCartItemToBillView(
-                    orderType = orderType,
-                    sessionId = sessionId,
-                    tableNo = tableNo,
-                    cartItems = latestCart,
-                    deviceId = deviceId,
-                    deviceName = deviceName,
-                    appVersion = "appVersion",
-                    role = role,
-                )
+//                val billSaved = saveCartItemToBillView(
+//                    orderType = orderType,
+//                    sessionId = sessionId,
+//                    tableNo = tableNo,
+//                    cartItems = latestCart,
+//                    deviceId = deviceId,
+//                    deviceName = deviceName,
+//                    appVersion = "appVersion",
+//                    role = role,
+//                )
             //    Log.d("WaiterKitchenVM", " items=${latestCart.size}")
-                if (!billSaved) {
-                    Log.e("WaiterKitchenVM", "❌ Bill save failed")
-                    return@launch
-                }
+//                if (!billSaved) {
+//                    Log.e("WaiterKitchenVM", "❌ Bill save failed")
+//                    return@launch
+//                }
 
                 repository.clearCart(orderType, tableNo)
                 cartRepository.syncCartCount(tableNo)
@@ -177,6 +177,143 @@ class WaiterKitchenViewModel(
     }
 
 
+
+
+    fun posFireStoreToWaiterBill(
+        cartList: List<PosCartEntity>,
+        tableNo: String,
+        deviceId: String,
+        deviceName: String?,
+        role : String
+    ) {
+        if (isProcessing) return   // 🔥 Prevent duplicate presses
+
+        viewModelScope.launch {
+            // Always get fresh items from DB
+            val dao = AppDatabaseProvider.get(getApplication()).cartDao()
+            val latestCart = try {
+                dao.getCartItemsByTableId(tableNo).first()
+            } catch (e: Exception) {
+                Log.e("WaiterKitchenVM", "❌ Failed to load cart from DB: ${e.message}", e)
+                emptyList()
+            }
+
+            if (latestCart.isEmpty()) {
+                Log.w("WaiterKitchenVM", "⚠️ No items found in DB for table=$tableNo")
+                return@launch
+            }
+
+
+            if (isProcessing) return@launch
+            isProcessing = true
+            _loading.value = true
+
+            try {
+                val billSaved = saveCartItemToBillView(
+                    orderType = orderType,
+                    sessionId = sessionId,
+                    tableNo = tableNo,
+                    cartItems = cartList,
+                    deviceId = deviceId,
+                    deviceName = deviceName,
+                    appVersion = "appVersion",
+                    role = role,
+                )
+
+                if (!billSaved) {
+                    Log.e("WaiterKitchenVM", "❌ Bill save failed")
+                    return@launch
+                }
+
+               // repository.clearCart(orderType, tableNo)
+                cartRepository.syncCartCount(tableNo)
+
+                Log.d("WaiterKitchenVM", "✅ Firestore + Bill saved successfully")
+
+                // ✅ MOVE HERE
+                _sendSuccess.value = true
+
+            } catch (e: Exception) {
+                Log.e("WaiterKitchenVM", "❌ Error in waiterCartToBill", e)
+            } finally {
+
+                // ⭐ VERY IMPORTANT
+                _loading.value = false
+                isProcessing = false
+            }
+        }
+
+
+
+
+
+    }
+
+
+    fun replaceKotFromFirestoreWaiterListener(
+        tableId: String,
+        sessionId: String,
+        items: List<Map<String, Any>>,
+        source: String
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+
+                // 🚫 SAFETY: Only process Firestore data here
+                if (source != "FIRESTORE") {
+                    Log.d("SYNC_VM", "⛔ Ignored non-firestore source")
+                    return@launch
+                }
+
+                // 🔥 STEP 1: DELETE OLD ITEMS
+                kotRepository.deleteKotByTable(tableId)
+
+                if (items.isEmpty()) {
+                    Log.d("SYNC_VM", "🪹 Table empty after delete: $tableId")
+                    return@launch
+                }
+
+                // 🔥 STEP 2: MAP ITEMS
+                val cartList = items.map { item ->
+                    PosCartEntity(
+                        sessionId = sessionId,
+                        tableId = tableId,
+                        productId = item["productId"]?.toString() ?: "",
+                        name = item["name"]?.toString() ?: "",
+                        categoryId = "",
+                        categoryName = item["category"]?.toString() ?: "",
+                        parentId = null,
+                        isVariant = false,
+                        basePrice = (item["price"] as? Number)?.toDouble() ?: 0.0,
+                        quantity = (item["quantity"] as? Number)?.toInt() ?: 1,
+                        taxRate = 0.0,
+                        taxType = "exclusive",
+                        note = item["note"]?.toString() ?: "",
+                        modifiersJson = "",
+                        kitchenPrintReq = false, // 🚫 IMPORTANT (avoid reprint loop)
+                        createdAt = System.currentTimeMillis()
+                    )
+                }
+
+                Log.d("SYNC_VM", "🍽 Syncing ${cartList.size} items from Firestore")
+
+                // 🔥 STEP 3: SAVE LOCALLY (NO FIRESTORE SYNC)
+                saveCartItemToBillView(
+                    orderType = "DINE_IN",
+                    sessionId = sessionId,
+                    tableNo = tableId,
+                    cartItems = cartList,
+                    deviceId = "FIRESTORE_SYNC",
+                    deviceName = "FIRESTORE_SYNC",
+                    appVersion = "FIRESTORE_SYNC",
+                    role = "FIRESTORE_TABLE"
+                )
+
+            } catch (e: Exception) {
+                Log.e("SYNC_VM", "❌ replaceKotFromFirestore failed", e)
+            }
+        }
+    }
 
     private suspend fun saveCartItemToBillView(
         orderType: String,

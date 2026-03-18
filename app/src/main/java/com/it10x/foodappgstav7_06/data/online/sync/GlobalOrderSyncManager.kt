@@ -11,6 +11,7 @@ import com.it10x.foodappgstav7_06.data.pos.entities.PosCartEntity
 import com.it10x.foodappgstav7_06.data.pos.entities.PosKotItemEntity
 import com.it10x.foodappgstav7_06.data.pos.entities.ProcessedCloudOrderEntity
 import com.it10x.foodappgstav7_06.ui.kitchen.KitchenViewModel
+import com.it10x.foodappgstav7_06.ui.waiterkitchen.WaiterKitchenViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -21,6 +22,7 @@ class GlobalOrderSyncManager(
     private val firestore: FirebaseFirestore,
     private val processedDao: ProcessedCloudOrderDao,
     private val kitchenViewModel: KitchenViewModel,
+   // private val waiterkitchenViewModel: WaiterKitchenViewModel,
     private val role: PosRole
 ) {
 
@@ -75,6 +77,7 @@ class GlobalOrderSyncManager(
                     val orderId = orderDoc.id
                     val tableNo = orderDoc.getString("tableNo") ?: ""
                     val sessionId = orderDoc.getString("sessionId") ?: ""
+                    val source = orderDoc.getString("source") ?: "UNKNOWN"
 
                     Log.d("KOT_DEBUG", "Processing orderId = $tableNo")
 
@@ -132,7 +135,7 @@ class GlobalOrderSyncManager(
                             Log.d("KOT_DEBUG", "In Firestore core Called ${tableNo}")
 
                             // 🚀 Call ViewModel to process and print KOT
-                            kitchenViewModel.createKotAndPrintFirestore(
+                            kitchenViewModel.saveKotFromFirestoreWaiter(
                                 orderType = "DINE_IN",
                                 sessionId = sessionId,
                                 tableNo = tableNo,
@@ -140,8 +143,9 @@ class GlobalOrderSyncManager(
                                 deviceId = "WAITER",
                                 deviceName = "WAITER",
                                 appVersion = "WAITER",
-                                role = "FIRESTORE"
-                            )
+                                role = "FIRESTORE",
+                                source = source,
+                               )
 
                             // ✅ Delete order and its items after successful processing
                             try {
@@ -182,7 +186,6 @@ class GlobalOrderSyncManager(
     // Listen to only MAIN POS orders
 
     private fun startWaiterListener() {
-        Log.d("SYNC", "🚀 WAITER listener started")
 
         waiterListener?.remove()
         waiterListener = null
@@ -203,12 +206,15 @@ class GlobalOrderSyncManager(
                     val doc = change.document
 
                     val tableId = doc.id
+                    val source = doc.getString("source") ?: "UNKNOWN"
                     val sessionId = doc.getString("sessionId") ?: tableId
                     val status = doc.getString("status") ?: "UNKNOWN"
                     val active = doc.getBoolean("active") ?: false
                     val updatedAt = doc.getLong("updatedAt") ?: 0L
 
                     val items = doc.get("items") as? List<Map<String, Any>> ?: emptyList()
+
+                    Log.d("SYNC_FLOW", "🚀 Listener hit → source=$source")
 
                     // 🔥 LOGGING
                     when (change.type) {
@@ -223,17 +229,15 @@ class GlobalOrderSyncManager(
                         }
                     }
 
-                    Log.d("SYNC", "📌 Table: $tableId | Status: $status | Active: $active")
-
                     if (items.isEmpty()) {
                         Log.d("SYNC", "🪹 No items in table")
                     } else {
-                        items.forEachIndexed { index, item ->
-                            Log.d(
-                                "SYNC",
-                                "🍽 Item[$index] → ${item["name"]} | Qty: ${item["quantity"]} | Price: ${item["price"]}"
-                            )
-                        }
+//                        items.forEachIndexed { index, item ->
+//                            Log.d(
+//                                "SYNC",
+//                                "🍽 Item[$index] → ${item["name"]} | Qty: ${item["quantity"]} | Price: ${item["price"]}"
+//                            )
+//                        }
                     }
 
                     // ✅ ONLY PROCESS ADDED / MODIFIED
@@ -244,7 +248,7 @@ class GlobalOrderSyncManager(
                     scope.launch(Dispatchers.IO) {
                         try {
 
-                            // 🔐 DEDUP (VERY IMPORTANT)
+                            // 🔐 DEDUP (CORE FIX)
                             val uniqueId = "${tableId}_$updatedAt"
 
                             val insertResult = processedDao.insert(
@@ -254,16 +258,20 @@ class GlobalOrderSyncManager(
                                 )
                             )
 
+                            // 🚫 ALREADY PROCESSED → SKIP
                             if (insertResult == -1L) {
                                 Log.d("SYNC", "⏭️ Already processed: $uniqueId")
                                 return@launch
                             }
 
-                            // ✅ SINGLE SOURCE OF TRUTH
-                            kitchenViewModel.replaceKotFromFirestore(
+                            // ✅ FIRST TIME ONLY (WAITER or POS both allowed once)
+                            Log.d("SYNC", "✅ Processing first time: $uniqueId (source=$source)")
+
+                            kitchenViewModel.replaceKotFromFirestoreWaiterListener(
                                 tableId = tableId,
                                 sessionId = sessionId,
-                                items = items
+                                items = items,
+                                source = "FIRESTORE"   // ✅ HERE
                             )
 
                         } catch (e: Exception) {

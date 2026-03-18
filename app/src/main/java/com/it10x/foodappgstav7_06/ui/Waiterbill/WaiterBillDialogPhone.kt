@@ -52,7 +52,7 @@ fun WaiterBillDialogPhone(
     val usedPaymentModes = remember { mutableStateListOf<String>() }
     var isCreditSelected by remember { mutableStateOf(false) }
 
-
+    var showCloseConfirm by remember { mutableStateOf(false) }
 
 
     val paymentList = remember { mutableStateListOf<PaymentInput>() }   // ✅ ADD THIS LINE
@@ -148,10 +148,11 @@ fun WaiterBillDialogPhone(
                         ) {
                             Text("Close", fontSize = 12.sp)
                         }
+
                     }
 
 
-
+                    Spacer(Modifier.height(10.dp))
 
                     Divider(thickness = 1.dp, color = Color.Gray.copy(alpha = 0.4f))
                     WaiterBillScreen(
@@ -185,33 +186,19 @@ fun WaiterBillDialogPhone(
                         .padding(vertical = 8.dp, horizontal = 6.dp)
 
                 ) {
-
-
                     // ---------- PAYMENT BUTTONS (Compact, Pastel Colors) ----------
-
                     Spacer(Modifier.height(4.dp))
-
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-
                         // Pay Later Button
                         Button(
+
                             onClick = {
-
-
-                                billViewModel.payBill(
-                                    payments = listOf(
-                                        PaymentInput("WAITER_PENDING", remainingAmount)
-                                    ),
-                                    name = "Customer",
-                                    phone = uiState.value.customerPhone
-                                )
-
-                                onDismiss()
+                                showCloseConfirm = true
                             },
-                            modifier = Modifier
+                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(38.dp),
                             colors = ButtonDefaults.buttonColors(
@@ -231,7 +218,53 @@ fun WaiterBillDialogPhone(
 // GLOBAL NUMPAD (Single Keyboard)
 // ===============================
 
+                    if (showCloseConfirm) {
+                        AlertDialog(
+                            onDismissRequest = { showCloseConfirm = false },
 
+                            title = {
+                                Text("Confirm Close Table")
+                            },
+
+                            text = {
+                                Text("Are you sure you want to close this table? This action cannot be undone.")
+                            },
+
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        showCloseConfirm = false
+
+                                        billViewModel.payBill(
+                                            payments = listOf(
+                                                PaymentInput("WAITER_PENDING", remainingAmount)
+                                            ),
+                                            name = "Customer",
+                                            phone = uiState.value.customerPhone
+                                        )
+
+                                        onDismiss()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFB71C1C),
+                                        contentColor = Color.White
+                                    )
+                                ) {
+                                    Text("Yes, Close")
+                                }
+                            },
+
+                            dismissButton = {
+                                OutlinedButton(
+                                    onClick = {
+                                        showCloseConfirm = false
+                                    }
+                                ) {
+                                    Text("Cancel")
+                                }
+                            }
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(12.dp))
                     Divider()

@@ -4,6 +4,7 @@ import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
 import com.it10x.foodappgstav7_06.data.pos.dao.KotItemDao
 import kotlinx.coroutines.tasks.await
+import okio.Source
 import java.util.UUID
 
 class TableKotSyncService(
@@ -12,7 +13,8 @@ class TableKotSyncService(
 ) {
 
     suspend fun syncTableSnapshot(
-        tableId: String
+        tableId: String,
+        source: String,
     ) {
         try {
             val tableRef = firestore
@@ -37,6 +39,7 @@ class TableKotSyncService(
 
             val data = mapOf(
                 "tableId" to tableId,
+                "source" to source,
                 "status" to if (itemList.isEmpty()) "EMPTY" else "RUNNING",
                 "active" to itemList.isNotEmpty(),
                 "items" to itemList,

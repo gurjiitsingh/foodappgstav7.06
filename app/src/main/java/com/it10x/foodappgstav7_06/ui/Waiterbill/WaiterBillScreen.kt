@@ -1,6 +1,5 @@
 package com.it10x.foodappgstav7_06.com.it10x.foodappgstav7_06.ui.Waiterbill
 
-import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -91,10 +90,6 @@ fun WaiterBillScreen(
 
     ) {
         // 🔹 Fixed Header
-
-
-
-
         // 🔹 Scrollable Item List (takes all remaining space)
         Box(
             modifier = Modifier
@@ -145,13 +140,13 @@ fun WaiterBillScreen(
 //                                }
 
                                 // 🔹 Note
-//                                if (item.note.isNotBlank()) {
-//                                    Text(
-//                                        text = item.note,
-//                                        style = MaterialTheme.typography.bodySmall,
-//                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-//                                    )
-//                                }
+                                if (item.note.isNotBlank()) {
+                                    Text(
+                                        text = item.note,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
 
                         }
@@ -193,15 +188,15 @@ fun WaiterBillScreen(
         Divider()
         Spacer(Modifier.height(6.dp))
 
-        BillRow("Sub Total", state.subtotal, currency)
-        if (state.discountApplied > 0) {
-            BillRow("Discount", -state.discountApplied, currency)
-        }
-        BillRow("Tax", state.tax, currency)
-
-
-
-        BillRow("Grand Total", state.total, currency, bold = true)
+//        BillRow("Sub Total", state.subtotal, currency)
+//        if (state.discountApplied > 0) {
+//            BillRow("Discount", -state.discountApplied, currency)
+//        }
+//        BillRow("Tax", state.tax, currency)
+//
+//
+//
+//        BillRow("Grand Total", state.total, currency, bold = true)
     }
 
 
@@ -233,48 +228,6 @@ fun WaiterBillScreen(
     }
 }
 
-// =====================================================
-// PAYMENT HANDLER
-// =====================================================
-
-
-private fun onPaymentClick(
-
-    viewModel: BillViewModel,
-    context: Context,
-    paymentType: PaymentType,
-    address: DeliveryAddressUiState,
-    onRequireAddress: () -> Unit,
-    onProceed: (PaymentType) -> Unit
-) {
-    if (viewModel.orderTypePublic == "DELIVERY" && !isAddressValid(address)) {
-        onRequireAddress()
-        return
-    }
-
-    if (viewModel.isProcessing.value) {
-        Toast.makeText(context, "Processing...", Toast.LENGTH_SHORT).show()
-        return
-    }
-
-    viewModel.viewModelScope.launch {
-
-        val hasPending = viewModel.hasPendingKitchenItems()
-
-        if (hasPending) {
-            Toast.makeText(
-                context,
-                "Kitchen items pending. Clear before billing.",
-                Toast.LENGTH_LONG
-            ).show()
-            return@launch
-        }
-
-        onProceed(paymentType)
-    }
-}
-
-
 
 // =====================================================
 // VALIDATION
@@ -305,27 +258,6 @@ private fun BillRow(label: String, value: Double,currency: String, bold: Boolean
             "$currency${"%.2f".format(value)}",
             fontWeight = if (bold) androidx.compose.ui.text.font.FontWeight.Bold else null
         )
-    }
-}
-
-@Composable
-private fun PaymentButton(
-    text: String,
-    isProcessing: Boolean,
-    onClick: () -> Unit
-) {
-    Button(
-        onClick = onClick,
-        enabled = !isProcessing
-    ) {
-        if (isProcessing) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(18.dp),
-                strokeWidth = 2.dp
-            )
-        } else {
-            Text(text)
-        }
     }
 }
 

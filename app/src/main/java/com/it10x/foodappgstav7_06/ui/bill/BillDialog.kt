@@ -51,12 +51,7 @@ fun BillDialog(
 
     val usedPaymentModes = remember { mutableStateListOf<String>() }
     var isCreditSelected by remember { mutableStateOf(false) }
-
-
-
-
     val paymentList = remember { mutableStateListOf<PaymentInput>() }   // ✅ ADD THIS LINE
-
 
     val billViewModel: BillViewModel = viewModel(
 
