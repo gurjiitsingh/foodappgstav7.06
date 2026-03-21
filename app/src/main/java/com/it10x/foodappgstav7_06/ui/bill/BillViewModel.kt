@@ -469,9 +469,8 @@ class BillViewModel(
 
                 resolvedCustomerId = inputPhone
 
-             //   val existingCustomer = customerDao.getCustomerById(inputPhone)
-                val existingCustomer = customerDao.getCustomerByPhone(inputPhone)
 
+                val existingCustomer = customerDao.getCustomerByPhone(inputPhone)
                     customerDao.increaseDue(inputPhone, totalCredit)
 
                 val lastBalance = ledgerDao.getLastBalance(inputPhone) ?: 0.0
