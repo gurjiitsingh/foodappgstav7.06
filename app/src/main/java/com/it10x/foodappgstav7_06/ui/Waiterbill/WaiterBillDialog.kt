@@ -130,7 +130,7 @@ fun WaiterBillDialog(
                         viewModel = billViewModel,
                         onPayClick = { paymentType ->
 
-                            val totalAmount = billViewModel.uiState.value.total
+                            val totalAmount = billViewModel.totalPaise
 
                             billViewModel.payBill(
                                 payments = listOf(
@@ -196,22 +196,7 @@ fun WaiterBillDialog(
 
                         Spacer(Modifier.height(14.dp))
 
-                    Button(
-                        onClick = {
 
-                            billViewModel.payBill(
-                                payments = listOf(
-                                    PaymentInput("DELIVERY_PENDING", remainingAmount)
-                                ),
-                                name = "Customer",
-                                phone = uiState.value.customerPhone
-                            )
-
-                            onDismiss()
-                        },
-                        modifier = Modifier.weight(1f).height(38.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9E9E9E), contentColor = Color.White)
-                    ) { Text("Close Table", fontSize = 13.sp) }
 
 
 

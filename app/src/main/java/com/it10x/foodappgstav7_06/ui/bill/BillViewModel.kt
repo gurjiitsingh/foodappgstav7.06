@@ -7,13 +7,10 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.it10x.foodappgstav7_06.data.PrinterRole
 import com.it10x.foodappgstav7_06.data.online.repository.CashierOrderSyncRepository
 import com.it10x.foodappgstav7_06.data.online.sync.TableKotSyncService
-import com.it10x.foodappgstav7_06.data.pos.AppDatabaseProvider
 import com.it10x.foodappgstav7_06.data.pos.dao.KotItemDao
 import com.it10x.foodappgstav7_06.data.pos.dao.OrderMasterDao
 import com.it10x.foodappgstav7_06.data.pos.dao.OrderProductDao
 import com.it10x.foodappgstav7_06.data.pos.dao.OutletDao
-import com.it10x.foodappgstav7_06.data.pos.entities.PosCartEntity
-import com.it10x.foodappgstav7_06.data.pos.entities.PosKotBatchEntity
 import com.it10x.foodappgstav7_06.data.pos.entities.PosKotItemEntity
 import com.it10x.foodappgstav7_06.data.pos.entities.PosOrderItemEntity
 import com.it10x.foodappgstav7_06.data.pos.entities.PosOrderMasterEntity
@@ -48,6 +45,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.update
 import com.it10x.foodappgstav7_06.data.pos.manager.TableSyncManager
 import com.it10x.foodappgstav7_06.utils.MoneyUtils
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
+import java.math.BigDecimal
 import kotlin.math.pow
 import kotlin.math.roundToLong
 
@@ -102,6 +102,63 @@ class BillViewModel(
 
     private val firestore = FirebaseFirestore.getInstance()
 
+    val totalPaise: Long
+        get() = MoneyUtils.toPaise(_uiState.value.total)
+    val unpaidModes = setOf("CREDIT", "DELIVERY_PENDING", "WAITER_PENDING")
+
+    private val _creditPaise = MutableStateFlow(0L)
+    val creditPaise: StateFlow<Long> = _creditPaise
+
+    fun setCreditAmountRaw(input: String) {
+        val clean = input.trim()
+
+        if (clean.isEmpty()) {
+            _creditPaise.value = 0L
+            return
+        }
+
+        val parts = clean.split(".")
+
+        val rupees = parts.getOrNull(0)?.toLongOrNull() ?: 0L
+        val paisePart = parts.getOrNull(1)?.padEnd(2, '0')?.take(2) ?: "00"
+        val paise = paisePart.toLongOrNull() ?: 0L
+
+        val finalPaise = rupees * 100 + paise
+
+        Log.d("BILL_DEBUG", "RAW INPUT: $input → $finalPaise paise")
+
+        _creditPaise.value = finalPaise
+    }
+
+    fun clearCredit() {
+        Log.d("BILL_DEBUG", "CLEAR CREDIT")
+        _creditPaise.value = 0L   // ✅ correct source of truth
+    }
+
+
+
+
+    // ✅ FINAL remaining flow (AUTO updates)
+    val remainingPaise: StateFlow<Long> =
+        combine(_uiState, _creditPaise) { ui, credit ->
+
+            val totalPaise = MoneyUtils.toPaise(ui.total)
+
+            val remaining = (totalPaise - credit).coerceAtLeast(0)
+
+            Log.d("BILL_DEBUG", "Total: $totalPaise | Credit: $credit | Remaining: $remaining")
+
+            remaining
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            0L
+        )
+
+
+
+
+
     private val tableKotSyncService = TableKotSyncService(
         firestore,
         kotItemDao
@@ -130,6 +187,8 @@ class BillViewModel(
         }
     }
 
+
+
   //  val outletInfo: StateFlow<OutletInfo> = outletRepository.outletInfo
     // ✅ Expose orderType safely for Compose UI
     val orderTypePublic: String
@@ -137,11 +196,11 @@ class BillViewModel(
 
     init {
 
-        Log.d(
-            "BILL_DEBUG",
-            "BillViewModel started with tableId=$tableId, orderType=$orderType"
-
-        )
+//        Log.d(
+//            "BILL_DEBUG",
+//            "BillViewModel started with tableId=$tableId, orderType=$orderType"
+//
+//        )
 
         observeBill()
         loadCurrency()
@@ -235,17 +294,6 @@ class BillViewModel(
                     )
                 }
 
-//                _uiState.update {
-//                    it.copy(
-//                        subtotal = subtotal,
-//                        tax = taxAfterDiscount,
-//                        discountApplied = safeDiscount,
-//                        total = finalTotal
-//                    )
-//                }
-
-
-
             }
         }
     }
@@ -281,13 +329,19 @@ class BillViewModel(
     // --------------------------------------------------------
     // Payment + Order Creation
     // --------------------------------------------------------
+
     fun payBill(
         payments: List<PaymentInput>,
         name: String,
         phone: String
     ) {
-        Log.d("PAY_DEBUG", "----------- PAYMENT INPUTS -----------")
+        Log.d("PAY_DEBUG", "creditPaise BEFORE payment = ${_creditPaise.value}")
+        val creditPaiseInput = _creditPaise.value
+        val paidModes = setOf("CASH", "CARD", "UPI", "WALLET")
 
+
+        val hasPaid = payments.any { it.mode in paidModes }
+        val hasUnpaid = payments.any { it.mode in unpaidModes }
 
         if (_isProcessing.value) {
             sendEvent("Payment already in progress")
@@ -317,13 +371,18 @@ class BillViewModel(
                 val itemSubtotalPaise =
                     kotItems.sumOf { MoneyUtils.toPaise(it.basePrice) * it.quantity }
 
+
+
                 val taxTotalPaise = kotItems.sumOf {
 
                     if (it.taxType == "exclusive") {
 
                         val basePaise = MoneyUtils.toPaise(it.basePrice)
 
-                        ((basePaise * it.taxRate) / 100.0).roundToLong() * it.quantity
+                        val taxPerItem =
+                            ((basePaise * it.taxRate) / 100.0).roundToLong()
+
+                      taxPerItem * it.quantity
 
                     } else 0L
                 }
@@ -344,7 +403,7 @@ class BillViewModel(
 
                 val flatPaise = MoneyUtils.toPaise(_discountFlat.value)
                 val percentPaise =
-                    (itemSubtotalPaise * _discountPercent.value / 100.0).toLong()
+                    ((itemSubtotalPaise * _discountPercent.value) / 100.0).roundToLong()
 
                 val discountPaise =
                     if (flatPaise > 0) flatPaise else percentPaise
@@ -361,49 +420,41 @@ class BillViewModel(
             // PAYMENT CALCULATION
             // ===========================
 
-                val unpaidModes = setOf("CREDIT", "DELIVERY_PENDING", "WAITER_PENDING")
 
                 val totalPaidPaise = payments
-                    .filter { it.mode !in unpaidModes }
-                    .sumOf { MoneyUtils.toPaise(it.amount) }
-
-
-
-            val totalCredit = payments
-                .filter { it.mode == "CREDIT" }
-                .sumOf { it.amount }
-
-            val deliveryPending = payments
-                .filter { it.mode == "DELIVERY_PENDING" }
-                .sumOf { it.amount }
-
-                val waiterPending = payments
-                    .filter { it.mode == "WAITER_PENDING" }
+                    .filter { it.mode in paidModes }
                     .sumOf { it.amount }
 
-                val paidAmountPaise = when {
-                    deliveryPending > 0 -> 0L
-                    waiterPending > 0 -> 0L
-                    else -> totalPaidPaise
-                }
-
-                val duePaise = (grandTotalPaise - totalPaidPaise).coerceAtLeast(0)
-
-                val adjustedDue = if (duePaise <= 0) 0 else duePaise
-
+// 👇 FIRST define paymentStatus
+                val hasCredit = creditPaiseInput > 0
 
                 val paymentStatus = when {
 
-                    waiterPending > 0 -> "WAITER_PENDING"
+                    payments.any { it.mode == "WAITER_PENDING" } -> "WAITER_PENDING"
 
-                    deliveryPending > 0 -> "DELIVERY_PENDING"
+                    payments.any { it.mode == "DELIVERY_PENDING" } -> "DELIVERY_PENDING"
 
-                    totalPaidPaise == 0L && totalCredit > 0 -> "CREDIT"
+                    hasPaid && hasCredit -> "PARTIAL"
 
-                    adjustedDue > 0 -> "PARTIAL"
+                    hasCredit -> "CREDIT"
 
                     else -> "PAID"
                 }
+
+
+//                Log.d("PAY_DEBUG", "hasPaid = $hasPaid")
+//                Log.d("PAY_DEBUG", "creditPaiseInput = $creditPaiseInput")
+//                Log.d("PAY_DEBUG", "paymentStatus = $paymentStatus")
+
+// 👇 THEN use it
+
+
+                val duePaise = creditPaiseInput
+
+                val dueAmount = BigDecimal.valueOf(creditPaiseInput, 2)
+                    .setScale(2, java.math.RoundingMode.HALF_UP)
+                    .toDouble()
+
 
 
             // ===========================
@@ -411,18 +462,16 @@ class BillViewModel(
             // ===========================
 
 
-                val isCashOnly = payments.all { it.mode == "CASH" }
 
-                if (!isCashOnly &&
-                    (paymentStatus == "CREDIT" || paymentStatus == "PARTIAL") &&
-                    inputPhone.isBlank()
-                ) {
+
+                if (paymentStatus in listOf("CREDIT", "PARTIAL") && inputPhone.isBlank())
+                 {
                     sendEvent("Phone required for credit sale")
                     return@launch
                 }
 
 
-            // ===========================
+  // ===========================
 // ENSURE CUSTOMER EXISTS (IF PHONE ENTERED)
 // ===========================
 
@@ -457,43 +506,59 @@ class BillViewModel(
                     customerDao.insert(customer)
                 }
             }
-
-
             // ===========================
             // CUSTOMER CREDIT HANDLING
             // ===========================
 
+                if (paymentStatus == "CREDIT" || paymentStatus == "PARTIAL") {
 
+                    val cleanPhone = inputPhone.trim()
+                    resolvedCustomerId = cleanPhone
 
-            if (paymentStatus == "CREDIT" || paymentStatus == "PARTIAL") {
+                    val creditToAdd = duePaise / 100.0
 
-                resolvedCustomerId = inputPhone
+                    Log.d("LEDGER_DEBUG", "Running DB block")
 
+                    val existingCustomer = customerDao.getCustomerByPhone(cleanPhone)
 
-                val existingCustomer = customerDao.getCustomerByPhone(inputPhone)
-                    customerDao.increaseDue(inputPhone, totalCredit)
+                    if (existingCustomer == null) {
+                        Log.e("CREDIT", "❌ Customer NOT FOUND for phone = $cleanPhone")
+                        return@launch
+                    }
 
-                val lastBalance = ledgerDao.getLastBalance(inputPhone) ?: 0.0
-                val newBalance = lastBalance + totalCredit
+                    Log.e("CREDIT", "✅ Customer FOUND id = ${existingCustomer.id}")
+                    Log.e("CREDIT", "Credit amount = $creditToAdd")
 
-                val ledgerEntry = PosCustomerLedgerEntity(
-                    id = UUID.randomUUID().toString(),
-                    ownerId = outlet.ownerId,
-                    outletId = outlet.outletId,
-                    customerId = inputPhone,
-                    orderId = orderId,
-                    paymentId = null,
-                    type = "ORDER",
-                    debitAmount = totalCredit,
-                    creditAmount = 0.0,
-                    balanceAfter = newBalance,
-                    note = "Credit sale Order #$srno",
-                    createdAt = now,
-                    deviceId = "POS"
-                )
+                    // ✅ FIX: use ID (NOT phone)
+                    customerDao.increaseDue(existingCustomer.id, creditToAdd)
 
-                ledgerDao.insert(ledgerEntry)
-            }
+                    val updatedCustomer = customerDao.getCustomerById(existingCustomer.id)
+
+                    Log.e("CREDIT_DEBUG", "OLD due = ${existingCustomer.currentDue}")
+                    Log.e("CREDIT_DEBUG", "NEW due = ${updatedCustomer?.currentDue}")
+                    val lastBalance = ledgerDao.getLastBalance(existingCustomer.id) ?: 0.0
+                    val newBalance = lastBalance + creditToAdd
+
+                    val ledgerEntry = PosCustomerLedgerEntity(
+                        id = UUID.randomUUID().toString(),
+                        ownerId = outlet.ownerId,
+                        outletId = outlet.outletId,
+                        customerId = existingCustomer.id,   // ✅ FIX
+                        orderId = orderId,
+                        paymentId = null,
+                        type = "ORDER",
+                        debitAmount = creditToAdd,
+                        creditAmount = 0.0,
+                        balanceAfter = newBalance,
+                        note = "Credit sale Order #$srno",
+                        createdAt = now,
+                        deviceId = "POS"
+                    )
+
+                    ledgerDao.insert(ledgerEntry)
+
+                    Log.d("LEDGER_DEBUG", "✅ Ledger inserted")
+                }
 
             val paymentMode =
                 if (payments.size > 1) "MIXED"
@@ -502,7 +567,7 @@ class BillViewModel(
             // ===========================
             // ORDER MASTER
             // ===========================
-//                Log.d("BILL_FACTORY", "BilViewmodel created with orderType=$orderType | tableId=$tableId")
+                Log.d("BILL_DEBUG ", "in ordermaste save: dueAmount:${dueAmount} credit: ${creditPaiseInput}")
             val orderMaster = PosOrderMasterEntity(
                 id = orderId,
                 srno = srno,
@@ -529,9 +594,9 @@ class BillViewModel(
                 paymentMode = paymentMode,
                 paymentStatus = paymentStatus,
                // paidAmount = paidAmount,
-                paidAmount = MoneyUtils.fromPaise(paidAmountPaise),
-              //  dueAmount = dueAmount,
-                dueAmount = MoneyUtils.fromPaise(adjustedDue),
+                paidAmount = MoneyUtils.fromPaise(totalPaidPaise),
+
+                dueAmount =dueAmount,
 
                 orderStatus = "COMPLETED",
 
@@ -565,10 +630,10 @@ class BillViewModel(
 
                         val taxPerItem =
                             if (first.taxType == "exclusive")
-                                (first.basePrice * (first.taxRate / 100)).round(3)
+                                (first.basePrice * (first.taxRate / 100))
                             else 0.0
 
-                        val taxTotalItem = (taxPerItem * quantity).round(3)
+                        val taxTotalItem = (taxPerItem * quantity)
 
                         val finalPricePerItem = (first.basePrice + taxPerItem).round(2)
 
@@ -620,18 +685,24 @@ class BillViewModel(
 
                 withContext(Dispatchers.IO) {
 
+                    Log.d("TAX_DEBUG", "FINAL TAX PAISE (WRONG): $taxTotalPaise")
+                    Log.d("TAX_DEBUG", "FINAL TAX DOUBLE: ${MoneyUtils.fromPaise(taxTotalPaise)}")
+
                 orderMasterDao.insert(orderMaster)
                 orderProductDao.insertAll(orderItems)
 
                     if (payments.isNotEmpty() && totalPaidPaise > 0){
 
                     val paymentEntities = payments.map {
+//                        Log.d("BILL_DEBUG", "Saving Payment → Paise=${it.amount}")
+                        val amountDouble = MoneyUtils.fromPaise(it.amount)
+//                        Log.d("BILL_DEBUG", "Converted to Double = $amountDouble")
                         PosOrderPaymentEntity(
                             id = UUID.randomUUID().toString(),
                             orderId = orderId,
                             ownerId = outlet.ownerId,
                             outletId = outlet.outletId,
-                            amount = it.amount,
+                            amount = MoneyUtils.fromPaise(it.amount),
                             mode = it.mode,
                             provider = null,
                             method = null,
@@ -674,17 +745,6 @@ class BillViewModel(
         }
     }
 
-//    fun deleteItem(itemId: String) {
-//        viewModelScope.launch {
-//            try {
-//                kotItemDao.deleteItemById(itemId)   // 👈 use internal tableId
-//                kotRepository.syncBillCount(tableId)         // 👈 update table status here
-//            } catch (e: Exception) {
-//                Log.e("DELETE", "Failed to delete item", e)
-//            }
-//        }
-//    }
-
     fun Double.round(decimals: Int): Double {
         val factor = 10.0.pow(decimals)
         return kotlin.math.round(this * factor) / factor
@@ -721,25 +781,7 @@ class BillViewModel(
     }
 
 
-    fun deleteItem1(itemId: String) {
-        viewModelScope.launch {
-            try {
-                kotItemDao.deleteItemById(itemId)
-                Log.d("DELETE", "Item deleted: $itemId")
 
-                // Optional: refresh list to update UI
-//                val newList = kotItemDao.getItemsForTableSync(currentTableId)
-//                _uiState.update { it.copy(items = newList) }
-
-            } catch (e: Exception) {
-                Log.e("DELETE", "Failed to delete item", e)
-            }
-          //  kotRepository.syncBillCount(tableNo)
-//            repository.updateTableStatusOnDelete
-//            kotRepository.syncKinchenCount(tableNo)
-//            kotRepository.syncBillCount(tableNo)
-        }
-    }
     // --------------------------------------------------------
     // Set Delivery Address
     // --------------------------------------------------------

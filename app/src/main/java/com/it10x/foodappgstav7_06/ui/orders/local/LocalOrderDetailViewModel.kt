@@ -44,9 +44,9 @@ class LocalOrderDetailViewModel(
         .map { it?.paidAmount ?: 0.0 }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
 
-    val dueAmount = combine(grandTotal, totalPaid) { total, paid ->
-        (total - paid).coerceAtLeast(0.0)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
+    val dueAmount = orderInfo
+        .map { it?.dueAmount ?: 0.0 }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
 
     val paymentStatus = combine(totalPaid, dueAmount) { paid, due ->
         when {

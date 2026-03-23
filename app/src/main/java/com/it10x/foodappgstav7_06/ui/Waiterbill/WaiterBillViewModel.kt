@@ -368,7 +368,7 @@ class WaiterBillViewModel(
 
             val paymentStatus = when {
                 deliveryPending > 0 -> "DELIVERY_PENDING"
-                totalPaid == 0.0 && totalCredit > 0 -> "CREDIT"
+               // totalPaid == 0.0 && totalCredit > 0 -> "CREDIT"
                 dueAmount > 0 -> "PARTIAL"
                 else -> "PAID"
             }
@@ -447,7 +447,7 @@ class WaiterBillViewModel(
                 Log.e("CREDIT", "customer hew credit: ${totalCredit}")
 
 
-                    customerDao.increaseDue(inputPhone, totalCredit)
+//                    customerDao.increaseDue(inputPhone, totalCredit)
 
                 val lastBalance = ledgerDao.getLastBalance(inputPhone) ?: 0.0
                 val newBalance = lastBalance + totalCredit
@@ -460,7 +460,7 @@ class WaiterBillViewModel(
                     orderId = orderId,
                     paymentId = null,
                     type = "ORDER",
-                    debitAmount = totalCredit,
+                    debitAmount =00.99,
                     creditAmount = 0.0,
                     balanceAfter = newBalance,
                     note = "Credit sale Order #$srno",
@@ -503,7 +503,7 @@ class WaiterBillViewModel(
 
                 paymentMode = paymentMode,
                 paymentStatus = paymentStatus,
-                paidAmount = paidAmount,
+                paidAmount = 00.00,
                 dueAmount = dueAmount,
 
                 orderStatus = "COMPLETED",
@@ -598,7 +598,7 @@ class WaiterBillViewModel(
                             orderId = orderId,
                             ownerId = outlet.ownerId,
                             outletId = outlet.outletId,
-                            amount = it.amount,
+                            amount = 00.00,
                             mode = it.mode,
                             provider = null,
                             method = null,

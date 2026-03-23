@@ -84,7 +84,7 @@ fun BillDialogPhone(
                             payments = listOf(
                                 PaymentInput(
                                     mode = paymentType.name,
-                                    amount = totalAmount
+                                    amount =1111
                                 )
                             ),
                             name = "Customer",
@@ -120,7 +120,7 @@ fun BillDialogPhone(
                                 payments = listOf(
                                     PaymentInput(
                                         mode = "CASH",
-                                        amount = billViewModel.uiState.value.total
+                                        amount = 111
                                     )
                                 ),
                                 name = "Customer",
@@ -143,7 +143,7 @@ fun BillDialogPhone(
                                 payments = listOf(
                                     PaymentInput(
                                         mode = "CARD",
-                                        amount = billViewModel.uiState.value.total
+                                        amount = 111
                                     )
                                 ),
                                 name = "Customer",
@@ -166,7 +166,7 @@ fun BillDialogPhone(
                                 payments = listOf(
                                     PaymentInput(
                                         mode = "UPI",
-                                        amount = billViewModel.uiState.value.total
+                                        amount = 111
                                     )
                                 ),
                                 name = "Customer",
@@ -189,7 +189,7 @@ fun BillDialogPhone(
                                 payments = listOf(
                                     PaymentInput(
                                         mode = "WALLET",
-                                        amount = billViewModel.uiState.value.total
+                                        amount = 111
                                     )
                                 ),
                                 name = "Customer",

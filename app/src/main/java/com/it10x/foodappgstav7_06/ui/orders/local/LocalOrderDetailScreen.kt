@@ -209,6 +209,7 @@ fun OrderTotals(
     status: String,           // <-- new
     onEditClick: () -> Unit = {}
 ) {
+
     Column {
         TotalRow("Subtotal", subtotal)
         TotalRow("GST", tax)

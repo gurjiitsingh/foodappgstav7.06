@@ -161,16 +161,16 @@ fun WaiterBillDialogPhone(
 
                             val totalAmount = billViewModel.uiState.value.total
 
-                            billViewModel.payBill(
-                                payments = listOf(
-                                    PaymentInput(
-                                        mode = paymentType.name,
-                                        amount = totalAmount
-                                    )
-                                ),
-                                name = "Customer",
-                                phone = uiState.value.customerPhone
-                            )
+//                            billViewModel.payBill(
+//                                payments = listOf(
+//                                    PaymentInput(
+//                                        mode = paymentType.name,
+//                                        amount = totalAmount
+//                                    )
+//                                ),
+//                                name = "Customer",
+//                                phone = uiState.value.customerPhone
+//                            )
 
                             onDismiss()
                         }
@@ -235,13 +235,13 @@ fun WaiterBillDialogPhone(
                                     onClick = {
                                         showCloseConfirm = false
 
-                                        billViewModel.payBill(
-                                            payments = listOf(
-                                                PaymentInput("WAITER_PENDING", remainingAmount)
-                                            ),
-                                            name = "Customer",
-                                            phone = uiState.value.customerPhone
-                                        )
+//                                        billViewModel.payBill(
+//                                            payments = listOf(
+//                                                PaymentInput("WAITER_PENDING", remainingAmount)
+//                                            ),
+//                                            name = "Customer",
+//                                            phone = uiState.value.customerPhone
+//                                        )
 
                                         onDismiss()
                                     },

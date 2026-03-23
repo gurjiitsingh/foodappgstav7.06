@@ -348,6 +348,8 @@ fun LocalPosOrderTableRow(
     onPrintBill: () -> Unit,
     onPrintKitchen: () -> Unit
 ) {
+
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
