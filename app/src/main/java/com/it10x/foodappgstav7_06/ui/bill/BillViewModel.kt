@@ -45,6 +45,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.update
 import com.it10x.foodappgstav7_06.data.pos.manager.TableSyncManager
 import com.it10x.foodappgstav7_06.utils.MoneyUtils
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import java.math.BigDecimal
@@ -730,7 +731,7 @@ class BillViewModel(
                         Log.e("TABLE_SYNC", "❌ Failed to clear table", e)
                     }
             }
-
+                delay(200)
             printOrder(orderMaster, orderItems)
                 sendEvent("Payment successful")
 
@@ -801,7 +802,7 @@ class BillViewModel(
         val outlet = outletDao.getOutlet()
         val outletInfo = OutletMapper.fromEntity(outlet)
 
-        printerManager.printTextNew(PrinterRole.BILLING, printOrder)
+        printerManager.printTextNewSuspend(PrinterRole.BILLING, printOrder)
         Log.d("PRINT_ORDER", "Receipt printed successfully | orderNo=${order.srno}")
     }
 

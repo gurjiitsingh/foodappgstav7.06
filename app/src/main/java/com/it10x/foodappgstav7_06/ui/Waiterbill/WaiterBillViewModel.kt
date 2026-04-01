@@ -37,6 +37,7 @@ import com.it10x.foodappgstav7_06.data.pos.entities.PosCustomerEntity
 import com.it10x.foodappgstav7_06.data.pos.entities.PosCustomerLedgerEntity
 import com.it10x.foodappgstav7_06.data.pos.repository.KotRepository
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
 
 class WaiterBillViewModel(
@@ -617,7 +618,7 @@ class WaiterBillViewModel(
                         orderType = orderType
                     )
             }
-
+                delay(300)
             printOrder(orderMaster, orderItems)
                 sendEvent("Payment successful")
 
@@ -685,6 +686,10 @@ class WaiterBillViewModel(
         printerManager.printTextNew(PrinterRole.BILLING, printOrder)
         Log.d("PRINT_ORDER", "Receipt printed successfully | orderNo=${order.srno}")
     }
+
+
+
+
 
 
     fun getDoneItems(orderRef: String, orderType: String): Flow<List<PosKotItemEntity>> {

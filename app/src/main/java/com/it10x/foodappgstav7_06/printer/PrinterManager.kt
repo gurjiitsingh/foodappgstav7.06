@@ -15,6 +15,8 @@ import com.it10x.foodappgstav7_06.data.pos.AppDatabaseProvider
 import com.it10x.foodappgstav7_06.data.pos.entities.PosKotItemEntity
 import com.it10x.foodappgstav7_06.ui.sales.SalesUiState
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 class PrinterManager(
     private val context: Context
@@ -246,6 +248,20 @@ class PrinterManager(
             PrinterType.WIFI -> {
                 Log.e("PRINT_NEW", "WiFi printing not supported yet")
                 onResult(false)
+            }
+        }
+    }
+
+
+
+    suspend fun printTextNewSuspend(
+        role: PrinterRole,
+        order: PrintOrder
+    ): Boolean = suspendCancellableCoroutine { cont ->
+
+        printTextNew(role, order) { success ->
+            if (cont.isActive) {
+                cont.resume(success)
             }
         }
     }
